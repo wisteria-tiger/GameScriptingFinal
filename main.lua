@@ -21,19 +21,29 @@ end
 
 function love.load()
     player = {}
-    movementSpeed = 60
+    movementSpeed = 200
     player.x = 100
     player.y = 50
+    bullets = {}
+    bulletspeed = 500
 end
 
 function love.update(dt)
     movement(dt)
+    for i, b in ipairs(bullets) do
+        b.x = b.x + vx * dt
+        b.y = b.y + vy * dt
+    end
 end
 
 function love.draw()
     love.graphics.circle("fill", player.x, player.y, 10)
+    for i, b in ipairs(bullets) do
+        love.graphics.circle("fill", b.x, b.y, b.size)
+    end
 end
 
+-- Handles player movement
 function movement(dt)
     if love.keyboard.isDown("w") then
         player.y = player.y - movementSpeed * dt
@@ -50,4 +60,26 @@ function movement(dt)
     if love.keyboard.isDown("a") then
         player.x = player.x - movementSpeed * dt
     end
+end
+
+function love.mousepressed(x, y, button)
+    if button == 1 then
+        mouseX = x
+        mouseY = y
+        local angle = math.atan2(mouseX - player.y, mouseY - player.x)
+        vy = math.cos(angle) * bulletspeed
+        vx = math.sin(angle) * bulletspeed
+        
+        table.insert(bullets, {x = player.x, y = player.y, size = 5})
+    end
+end
+
+function shootbullet(dt) 
+        b = bullets[i]
+        
+
+        --if b.x > love.graphics.getWidth() or b.x < 0 or b.y < 0 or b.y > love.graphics.getHeight() then
+        --  table.remove(bullets, i)
+        --end
+    
 end
