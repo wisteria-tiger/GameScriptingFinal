@@ -30,10 +30,7 @@ end
 
 function love.update(dt)
     movement(dt)
-    for i, b in ipairs(bullets) do
-        b.x = b.x + vx * dt
-        b.y = b.y + vy * dt
-    end
+    shootbullet(dt)
 end
 
 function love.draw()
@@ -62,11 +59,12 @@ function movement(dt)
     end
 end
 
+-- Calculats bullet angle and velocity 
 function love.mousepressed(x, y, button)
     if button == 1 then
         mouseX = x
         mouseY = y
-        local angle = math.atan2(mouseX - player.y, mouseY - player.x)
+        local angle = math.atan2(mouseX - player.x, mouseY - player.y)
         vy = math.cos(angle) * bulletspeed
         vx = math.sin(angle) * bulletspeed
         
@@ -74,12 +72,14 @@ function love.mousepressed(x, y, button)
     end
 end
 
+-- Fires bullet at calculated angle and velocity. Removes bullet from table if it leaves the screen
 function shootbullet(dt) 
-        b = bullets[i]
+    for i, b in ipairs(bullets) do
+        b.x = b.x + vx * dt
+        b.y = b.y + vy * dt
         
-
-        --if b.x > love.graphics.getWidth() or b.x < 0 or b.y < 0 or b.y > love.graphics.getHeight() then
-        --  table.remove(bullets, i)
-        --end
-    
+        if b.x > love.graphics.getWidth() or b.x < 0 or b.y < 0 or b.y > love.graphics.getHeight() then
+        table.remove(bullets, i)
+        end
+    end
 end
