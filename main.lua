@@ -64,11 +64,10 @@ function love.mousepressed(x, y, button)
     if button == 1 then
         mouseX = x
         mouseY = y
-        local angle = math.atan2(mouseX - player.x, mouseY - player.y)
+        angle = math.atan2(mouseX - player.x, mouseY - player.y)
         vy = math.cos(angle) * bulletspeed
         vx = math.sin(angle) * bulletspeed
-        
-        table.insert(bullets, {x = player.x, y = player.y, size = 5})
+        table.insert(bullets, {x = player.x, y = player.y, size = 5}) 
     end
 end
 
