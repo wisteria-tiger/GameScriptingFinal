@@ -12,12 +12,10 @@ end
 -- main.lua
 -- Simple top-down shooter in LÖVE2D
 
-function love.load()
-    love.window.setTitle("Top Down Shooter")
-    love.window.setMode(900, 600)
+-- main.lua
+-- Top Down Shooter with Title Screen
 
-    math.randomseed(os.time())
-
+function resetGame()
     player = {
         x = 450,
         y = 300,
@@ -32,7 +30,17 @@ function love.load()
     score = 0
     gameOver = false
     gameWin = false
-    gameStart = true
+end
+
+function love.load()
+    love.window.setTitle("Top Down Shooter")
+    love.window.setMode(900, 600)
+
+    math.randomseed(os.time())
+
+    gameState = "menu"
+
+    resetGame()
 end
 
 function spawnEnemy()
@@ -62,16 +70,18 @@ function spawnEnemy()
 end
 
 function love.update(dt)
-    if gameStart then
-        if gameOver then
+    if gameState ~= "playing" then
         return
     end
 
     if gameWin then
         return
     end
+    if gameOver then
+        return
+    end
 
-    -- Player movement
+    -- Movement
     local mx = 0
     local my = 0
 
@@ -89,6 +99,7 @@ function love.update(dt)
     end
 
     local len = math.sqrt(mx * mx + my * my)
+
     if len > 0 then
         mx = mx / len
         my = my / len
@@ -98,17 +109,21 @@ function love.update(dt)
     player.y = player.y + my * player.speed * dt
 
     -- Keep player in bounds
-    player.x = math.max(player.radius, math.min(love.graphics.getWidth() - player.radius, player.x))
-    player.y = math.max(player.radius, math.min(love.graphics.getHeight() - player.radius, player.y))
+    player.x = math.max(player.radius,
+        math.min(love.graphics.getWidth() - player.radius, player.x))
+
+    player.y = math.max(player.radius,
+        math.min(love.graphics.getHeight() - player.radius, player.y))
 
     -- Spawn enemies
     enemySpawnTimer = enemySpawnTimer + dt
+
     if enemySpawnTimer >= 1 then
         enemySpawnTimer = 0
         spawnEnemy()
     end
 
-    -- Update bullets
+    -- Bullets
     for i = #bullets, 1, -1 do
         local b = bullets[i]
 
@@ -121,7 +136,7 @@ function love.update(dt)
         end
     end
 
-    -- Update enemies
+    -- Enemies
     for i = #enemies, 1, -1 do
         local e = enemies[i]
 
@@ -137,12 +152,12 @@ function love.update(dt)
         e.x = e.x + dx * e.speed * dt
         e.y = e.y + dy * e.speed * dt
 
-        -- Collision with player
+        -- Player collision
         if dist < player.radius + e.radius then
             gameOver = true
         end
 
-        -- Bullet collisions
+        -- Bullet collision
         for j = #bullets, 1, -1 do
             local b = bullets[j]
 
@@ -164,7 +179,7 @@ function love.update(dt)
 end
 
 function love.mousepressed(x, y, button)
-    if button == 1 and not gameOver then
+    if button == 1 and gameState == "playing" and not gameOver then
         local dx = x - player.x
         local dy = y - player.y
         local dist = math.sqrt(dx * dx + dy * dy)
@@ -181,47 +196,82 @@ function love.mousepressed(x, y, button)
             radius = 5
         })
     end
-    end 
 end
 
 function love.keypressed(key)
-    if key == "r" and gameOver then
-        love.load()
+    -- Start game from menu
+    if gameState == "menu" and key == "return" then
+        resetGame()
+        gameState = "playing"
     end
-    if key == "enter" and gameStart then
-        gameStart = false
+
+    -- Restart after game over
+    if gameOver and key == "r" or gameWin and key == "r" then
+        resetGame()
+        gameState = "playing"
+    end
+
+    -- Return to menu
+    if key == "escape" then
+        gameState = "menu"
     end
 end
 
-function love.draw()
-    -- Background
-    love.graphics.clear(0.08, 0.08, 0.1)
+function drawMenu()
+    local w = love.graphics.getWidth()
+    local h = love.graphics.getHeight()
 
-    -- Draw player
+    love.graphics.setColor(1, 1, 1)
+
+    love.graphics.printf(
+        "TOP DOWN SHOOTER",
+        0,
+        120,
+        w,
+        "center"
+    )
+
+    love.graphics.printf(
+        "Controls\n\n" ..
+        "WASD - Move\n" ..
+        "Left Mouse - Shoot\n" ..
+        "ESC - Return to Menu\n" ..
+        "R - Restart After Death\n\n" ..
+        "Press ENTER to Start",
+        0,
+        220,
+        w,
+        "center"
+    )
+end
+
+function drawGame()
+    -- Player
     love.graphics.setColor(0.2, 0.9, 0.3)
     love.graphics.circle("fill", player.x, player.y, player.radius)
 
-    -- Draw bullets
+    -- Bullets
     love.graphics.setColor(1, 1, 0)
     for _, b in ipairs(bullets) do
         love.graphics.circle("fill", b.x, b.y, b.radius)
     end
 
-    -- Draw enemies
+    -- Enemies
     love.graphics.setColor(0.9, 0.2, 0.2)
     for _, e in ipairs(enemies) do
         love.graphics.circle("fill", e.x, e.y, e.radius)
     end
 
-    -- UI
+    -- Score
     love.graphics.setColor(1, 1, 1)
     love.graphics.print("Score: " .. score, 10, 10)
 
+    -- Game Over
     if gameOver then
         love.graphics.printf(
-            "GAME OVER\nPress R to Restart",
+            "GAME OVER\n\nPress R to Restart\nPress ESC for Menu",
             0,
-            love.graphics.getHeight() / 2 - 30,
+            love.graphics.getHeight() / 2 - 40,
             love.graphics.getWidth(),
             "center"
         )
@@ -229,12 +279,23 @@ function love.draw()
 
     if gameWin then
         love.graphics.printf(
-            "YOU WIN!\nPress R to Restart",
+            "GAME WIN\n\nPress R to Restart\nPress ESC for Menu",
             0,
-            love.graphics.getHeight() / 2 - 30,
+            love.graphics.getHeight() / 2 - 40,
             love.graphics.getWidth(),
             "center"
         )
+    end
+end
+
+function love.draw()
+    -- Background
+    love.graphics.clear(0.08, 0.08, 0.1)
+
+    if gameState == "menu" then
+        drawMenu()
+    elseif gameState == "playing" then
+        drawGame()
     end
 end
 
