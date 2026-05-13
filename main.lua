@@ -1,18 +1,6 @@
-if arg[2] == "debug" then
+if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then
     require("lldebugger").start()
 end
-
-local love_errorhandler = love.errorhandler
-
-function love.errorhandler(msg)
-    if lldebugger then
-        error(msg, 2)
-    else
-        return love_errorhandler(msg)
-    end
-end
-
-require("enemy")
 
 -- TOPDOWN SHOOTER GAME
 -- Create functionality for player movement and shooting
@@ -21,100 +9,242 @@ require("enemy")
 -- Create functionality for start screen and gameover on death
 -- Let player restart game from gameover screen 
 
+-- main.lua
+-- Simple top-down shooter in LÖVE2D
+
 function love.load()
-    player = {}
-    movementSpeed = 200
-    player.x = 100
-    player.y = 50
+    love.window.setTitle("Top Down Shooter")
+    love.window.setMode(900, 600)
+
+    math.randomseed(os.time())
+
+    player = {
+        x = 450,
+        y = 300,
+        speed = 220,
+        radius = 18
+    }
+
     bullets = {}
-    bulletspeed = 500
     enemies = {}
-    spawnTimer = 0
-    spawnRate = 2
+
+    enemySpawnTimer = 0
+    score = 0
+    gameOver = false
+    gameWin = false
+    gameStart = true
+end
+
+function spawnEnemy()
+    local side = math.random(4)
+    local x, y
+
+    if side == 1 then
+        x = -30
+        y = math.random(0, love.graphics.getHeight())
+    elseif side == 2 then
+        x = love.graphics.getWidth() + 30
+        y = math.random(0, love.graphics.getHeight())
+    elseif side == 3 then
+        x = math.random(0, love.graphics.getWidth())
+        y = -30
+    else
+        x = math.random(0, love.graphics.getWidth())
+        y = love.graphics.getHeight() + 30
+    end
+
+    table.insert(enemies, {
+        x = x,
+        y = y,
+        speed = 100,
+        radius = 16
+    })
 end
 
 function love.update(dt)
-    movement(dt)
-    shootbullet(dt)
-    spawning(dt)
-end
-
-function love.draw()
-    love.graphics.setColor(250, 250, 250)
-    love.graphics.circle("fill", player.x, player.y, 10)
-    for i, b in ipairs(bullets) do
-        love.graphics.circle("fill", b.x, b.y, b.size)
+    if gameStart then
+        if gameOver then
+        return
     end
-    
-    for i, enemy in ipairs(enemies) do
-        love.graphics.setColor(250, 0, 0)
-        enemy:draw()
-    end
-end
 
--- Calculates bullet angle and velocity 
-function love.mousepressed(x, y, button)
-    if button == 1 then
-        mouseX = x
-        mouseY = y
-        angle = math.atan2(mouseX - player.x, mouseY - player.y)
-        vy = math.cos(angle) * bulletspeed
-        vx = math.sin(angle) * bulletspeed
-        table.insert(bullets, {x = player.x, y = player.y, size = 5}) 
+    if gameWin then
+        return
     end
-end
 
--- Handles player movement
-function movement(dt)
+    -- Player movement
+    local mx = 0
+    local my = 0
+
     if love.keyboard.isDown("w") then
-        player.y = player.y - movementSpeed * dt
+        my = my - 1
     end
-
-    if love.keyboard.isDown("d") then
-        player.x = player.x + movementSpeed * dt
-    end
-
     if love.keyboard.isDown("s") then
-        player.y = player.y + movementSpeed * dt
+        my = my + 1
     end
-
     if love.keyboard.isDown("a") then
-        player.x = player.x - movementSpeed * dt
+        mx = mx - 1
     end
-end
+    if love.keyboard.isDown("d") then
+        mx = mx + 1
+    end
 
--- Fires bullet at calculated angle and velocity. Removes bullet from table if it leaves the screen
-function shootbullet(dt) 
-    for i, b in ipairs(bullets) do
-        b.x = b.x + vx * dt
-        b.y = b.y + vy * dt
-         
-        if b.x > love.graphics.getWidth() or b.x < 0 or b.y < 0 or b.y > love.graphics.getHeight() then
-        table.remove(bullets, i)
+    local len = math.sqrt(mx * mx + my * my)
+    if len > 0 then
+        mx = mx / len
+        my = my / len
+    end
+
+    player.x = player.x + mx * player.speed * dt
+    player.y = player.y + my * player.speed * dt
+
+    -- Keep player in bounds
+    player.x = math.max(player.radius, math.min(love.graphics.getWidth() - player.radius, player.x))
+    player.y = math.max(player.radius, math.min(love.graphics.getHeight() - player.radius, player.y))
+
+    -- Spawn enemies
+    enemySpawnTimer = enemySpawnTimer + dt
+    if enemySpawnTimer >= 1 then
+        enemySpawnTimer = 0
+        spawnEnemy()
+    end
+
+    -- Update bullets
+    for i = #bullets, 1, -1 do
+        local b = bullets[i]
+
+        b.x = b.x + b.dx * b.speed * dt
+        b.y = b.y + b.dy * b.speed * dt
+
+        if b.x < 0 or b.x > love.graphics.getWidth()
+        or b.y < 0 or b.y > love.graphics.getHeight() then
+            table.remove(bullets, i)
+        end
+    end
+
+    -- Update enemies
+    for i = #enemies, 1, -1 do
+        local e = enemies[i]
+
+        local dx = player.x - e.x
+        local dy = player.y - e.y
+        local dist = math.sqrt(dx * dx + dy * dy)
+
+        if dist > 0 then
+            dx = dx / dist
+            dy = dy / dist
+        end
+
+        e.x = e.x + dx * e.speed * dt
+        e.y = e.y + dy * e.speed * dt
+
+        -- Collision with player
+        if dist < player.radius + e.radius then
+            gameOver = true
+        end
+
+        -- Bullet collisions
+        for j = #bullets, 1, -1 do
+            local b = bullets[j]
+
+            local bx = e.x - b.x
+            local by = e.y - b.y
+            local bd = math.sqrt(bx * bx + by * by)
+
+            if bd < e.radius + b.radius then
+                table.remove(enemies, i)
+                table.remove(bullets, j)
+                score = score + 1
+                if score == 20 then
+                    gameWin = true
+                end
+                break
+            end
         end
     end
 end
 
-function spawning(dt)
-    spawnTimer = spawnTimer + dt
-    if spawnTimer > spawnRate then
-        spawnEnemy()
-        spawnTimer = 0
-    end
+function love.mousepressed(x, y, button)
+    if button == 1 and not gameOver then
+        local dx = x - player.x
+        local dy = y - player.y
+        local dist = math.sqrt(dx * dx + dy * dy)
 
-    -- Update existing enemies
-    for i, enemy in ipairs(enemies) do
-        enemy:update(dt, player.x, player.y) -- Assuming player is at 400,300
+        dx = dx / dist
+        dy = dy / dist
+
+        table.insert(bullets, {
+            x = player.x,
+            y = player.y,
+            dx = dx,
+            dy = dy,
+            speed = 500,
+            radius = 5
+        })
+    end
+    end 
+end
+
+function love.keypressed(key)
+    if key == "r" and gameOver then
+        love.load()
+    end
+    if key == "enter" and gameStart then
+        gameStart = false
     end
 end
 
-function spawnEnemy()
-    local x, y
-    side = love.math.random(1, 4)
-    if side == 1 then x = 0; y = love.math.random(0, love.graphics.getHeight()) -- Left
-    elseif side == 2 then x = love.graphics.getWidth(); y = love.math.random(0, love.graphics.getHeight()) -- Right
-    elseif side == 3 then x = love.math.random(0, love.graphics.getWidth()); y = 0 -- Top
-    else x = love.math.random(0, love.graphics.getWidth()); y = love.graphics.getHeight() -- Bottom
+function love.draw()
+    -- Background
+    love.graphics.clear(0.08, 0.08, 0.1)
+
+    -- Draw player
+    love.graphics.setColor(0.2, 0.9, 0.3)
+    love.graphics.circle("fill", player.x, player.y, player.radius)
+
+    -- Draw bullets
+    love.graphics.setColor(1, 1, 0)
+    for _, b in ipairs(bullets) do
+        love.graphics.circle("fill", b.x, b.y, b.radius)
     end
-    table.insert(enemies, Enemy.new(x, y))
+
+    -- Draw enemies
+    love.graphics.setColor(0.9, 0.2, 0.2)
+    for _, e in ipairs(enemies) do
+        love.graphics.circle("fill", e.x, e.y, e.radius)
+    end
+
+    -- UI
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.print("Score: " .. score, 10, 10)
+
+    if gameOver then
+        love.graphics.printf(
+            "GAME OVER\nPress R to Restart",
+            0,
+            love.graphics.getHeight() / 2 - 30,
+            love.graphics.getWidth(),
+            "center"
+        )
+    end
+
+    if gameWin then
+        love.graphics.printf(
+            "YOU WIN!\nPress R to Restart",
+            0,
+            love.graphics.getHeight() / 2 - 30,
+            love.graphics.getWidth(),
+            "center"
+        )
+    end
 end
+
+local love_errorhandler = love.errorhandler
+function love.errorhandler(msg)
+    if lldebugger then
+        error(msg, 2) -- Throws the error back to VS Code
+    else
+        return love_errorhandler(msg) -- Shows the standard blue error screen
+    end
+end
+
+
